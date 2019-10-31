@@ -1,0 +1,176 @@
+#!/bin/bash
+# xsuste11
+POSIXLY_CORRECT=yes
+
+#test realpath dodelat
+cesta=$(realpath .)
+#echo $cesta
+edittool="vi" #defaultni editor pro pripad ze nebylo nic zadane
+
+#overeni zda je zadan editor nebo visual
+if [ -z "$EDITOR" ]; then
+	if [ -z "$VISUAL" ]; then
+		echo "Nebyl zadan Editor ani visual" >&2
+	else
+		edittool=$VISUAL
+	fi
+else
+	edittool=$EDITOR
+fi
+
+#overeni zda byl zadan WEDI_RC, v pripade ze ne tak se vytvori ve slozce se scriptem
+if [ -z "$WEDI_RC" ]; then
+	cd $cesta
+	touch wedirc
+	export WEDI_RC=$cesta/wedirc
+fi
+
+#v pripade ze nebyl zadan zadny parametr  otevre se posledni upravovany soubor v korenoev slozce
+if [ "$#" -eq "0" ]; then
+	echo "nebyl zadan zadny parametr"
+	seznam="$(grep "$cesta/[^/]*$" $WEDI_RC | tac)"
+	#echo "$seznam"
+	for polozka in $seznam; do
+		if [ -f "$(echo "$polozka" -n | cut -d':' -f2)" ]; then
+			$edittool "$(echo "$polozka" | cut -d':' -f2)"
+			echo ""$(echo "$polozka" | cut -d':' -f1)":"$(echo "$polozka" | cut -d':' -f2)":$(date +%Y-%m-%d)" >> $WEDI_RC
+			break
+		fi
+	done
+fi
+
+if [ "$#" -eq "1" ]; then
+	#echo "byl zadan argument" $1
+	if [ -f "$1" ]; then
+		#echo "byl zadan soubor"
+		$edittool $1
+		echo "$(echo "$1" | rev | cut -d'/' -f1 | rev):$(realpath "$1"):$(date +%Y-%m-%d)" >> $WEDI_RC
+	elif [ -d "$1" ]; then
+		#echo "byla zadana slozka"
+		seznam="$(grep "$(realpath "$1")" $WEDI_RC | tac)"
+		#echo "$seznam"
+		for polozka in $seznam; do
+			if [ -f "$(echo "$polozka" -n | cut -d':' -f2)" ]; then
+				$edittool "$(echo "$polozka" | cut -d':' -f2)"
+				echo ""$(echo "$polozka" | cut -d':' -f1)":"$(echo "$polozka" | cut -d':' -f2)":$(date +%Y-%m-%d)" >> $WEDI_RC
+				break
+			fi
+		done
+	elif [ "$1" = "-m" ]; then
+		#echo "parametr -m"
+		#vybrat vsechny soubory s cestou ke slozce a zjistit jmeno toho ktery se objevi nejvickart
+		if [ -f "$(grep "$cesta/[^/]*$" $WEDI_RC | cut -d':' -f2 | sort | uniq -c| tail -1 | rev | cut -d' ' -f1 | rev )" ]; then
+			$edittool "$(grep "$cesta/[^/]*$" $WEDI_RC | cut -d':' -f2 | sort | uniq -c| tail -1 | rev | cut -d' ' -f1 | rev )"
+			echo ""$(grep "$cesta/[^/]*$" $WEDI_RC | cut -d':' -f1 | sort | uniq -c | tail -1 | rev | cut -d' ' -f1 | rev)":"$(grep "$cesta/[^/]*$" $WEDI_RC | cut -d':' -f2 | sort | uniq -c | tail -1 | rev | cut -d' ' -f1 | rev)":$(date +%Y-%m-%d)" >> $WEDI_RC
+		else
+			echo "Soubor nebyl nalezen" >&2
+		fi
+	elif [ "$1" = "-l" ]; then
+		#echo "param -l"
+		#vypise seznam souboru s odpovidajici cestou ktere jsou in wedi_rec bez duplicity
+		seznam="$(echo "$(grep "$cesta/[^/]*$" $WEDI_RC | cut -d':' -f1,2 | sort | uniq)")"
+		for polozka in $seznam; do
+				if [ -f "$(echo "$polozka" | cut -d':' -f2)" ];then
+					echo "$(echo "$polozka" | cut -d':' -f1 | sort | uniq)"
+				fi
+		done
+	else
+		echo "nebyl zadan soubor ani slozka" >&2
+	fi
+fi
+if [ "$#" -eq "2" ]; then
+	#echo "byly zadany 2 argumenty"
+	#echo "prvni argument je "$1
+	if [ "$1" = "-m" ]; then
+		#echo "parametr -m"
+		if [ -d "$2" ]; then
+			#echo "spravne zadano"
+			if [ -f "$(grep "$(realpath "$2")" $WEDI_RC | cut -d':' -f2 | sort | uniq -c | tail -1 | rev | cut -d' ' -f1 | rev)" ]; then
+				$edittool "$(grep "$(realpath "$2")" $WEDI_RC | cut -d':' -f2 | sort | uniq -c | tail -1 | rev | cut -d' ' -f1 | rev)"
+				echo ""$(grep "$(realpath "$2")" $WEDI_RC | cut -d':' -f1 | sort | uniq -c | tail -1 | rev | cut -d' ' -f1 | rev )":"$(grep "$(realpath "$2")" $WEDI_RC | cut -d':' -f2 | sort | uniq -c | tail -1 | rev | cut -d' ' -f1 | rev )":$(date +%Y-%m-%d)" >> $WEDI_RC
+			else
+				echo "Soubor nebyl nalezen" >&2
+			fi
+		fi
+	elif [ "$1" = "-l" ]; then
+		#echo "parametr -l"
+		if [ -d "$2" ]; then
+			#echo "spravne zadano"
+			seznam="$(grep "$(realpath "$2")" $WEDI_RC | cut -d':' -f1,2 | sort | uniq )"
+			#echo "$seznam"
+			for polozka in $seznam; do
+				if [ -f "$(echo "$polozka" | cut -d':' -f2)" ];then
+					echo "$(echo "$polozka" | cut -d':' -f1 | sort | uniq)"
+				fi
+			done
+		fi
+	elif [ "$1" = "-a" ]; then
+		#echo "parametr -a"
+		seznam="$(echo "$(grep "$cesta/[^/]*$" $WEDI_RC | sort)")"
+		#echo "$seznam"
+		for polozka in $seznam; do
+			#echo "$polozka"
+			if [ -f "$(echo "$polozka" | cut -d':' -f2)" ]; then
+				#echo "$polozka"
+				if [ $(date -d "$2" +%Y-%m-%d | sed "s/-//g") -le $(echo "$polozka" | cut -d':' -f3 | sed "s/-//g") ]; then
+					echo "$(echo "$polozka" |cut -d':' -f1 | sort | uniq)"
+				fi
+			fi
+		done
+	elif [ "$1" = "-b" ]; then
+		#echo "parametr -b"
+		seznam="$(echo "$(grep "$cesta/[^/]*$" $WEDI_RC | sort)")"
+        #echo "$seznam"
+        for polozka in $seznam; do
+			if [ -f "$(echo "$polozka" | cut -d':' -f2)" ]; then
+				#echo "$polozka"
+				if [ $(date -d "$2" +%Y-%m-%d | sed "s/-//g") -ge $(echo "$polozka" | cut -d':' -f3 | sed "s/-//g") ]; then
+                                echo "$(echo "$polozka" |cut -d':' -f1 | sort | uniq)"
+                fi
+			fi
+        done
+	else
+		echo "spatne zadane parametry" >&2
+	fi
+fi
+if [ "$#" -eq "3" ]; then
+	#echo "byly zadany 3 argumenty"
+	#echo "date: "$2
+	if [ "$1" = "-a" ]; then
+		#echo "parametr -a"
+		if [ -d "$3" ]; then
+			#echo "spravne zadany"
+			seznam="$(echo "$(grep "$(realpath "$3")" $WEDI_RC | sort)")"
+			#echo "$seznam"
+			for polozka in $seznam; do
+				if [ -f "$(echo "$polozka" | cut -d':' -f2)" ]; then
+					if [ $(date -d "$2" +%Y-%m-%d | sed "s/-//g") -le $(echo "$polozka" | cut -d':' -f2 |sed "s/-//g") ]; then
+						echo "$(echo "$polozka" |cut -d':' -f1 | sort | uniq)"
+					fi
+				fi
+			done
+		fi
+	elif [ "$1" = "-b" ]; then
+		#echo "paramerr -b"
+		if [ -d "$3" ]; then
+			#echo "spravne zadany"
+			seznam="$(echo "$(grep "$(realpath "$3")" $WEDI_RC | sort )")"
+			#echo "$seznam"
+			for polozka in $seznam; do
+				if [ -f "$(echo "$polozka" | cut -d':' -f2)" ]; then
+					if [ $(date -d "$2" +%Y-%m-%d | sed "s/-//g") -ge $(echo "$polozka" | cut -d':' -f2 | sed "s/-//g") ]; then
+						echo "$(echo "$polozka" | cut -d':' -f1 | sort | uniq)"
+					fi
+				fi
+			done
+		fi
+	else
+		echo "spatne zadane parametry" >&2
+	fi
+fi
+
+
+
+
+
+
